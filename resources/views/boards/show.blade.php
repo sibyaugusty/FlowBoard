@@ -29,6 +29,12 @@
             </div>
 
             {{-- Actions --}}
+            <button class="btn fb-btn-primary btn-sm" id="createTaskBtn" data-bs-toggle="modal" data-bs-target="#createTaskModal" title="Create Task">
+                <i class="bi bi-plus-lg me-1"></i>Create Task
+            </button>
+            <button class="btn fb-btn-secondary btn-sm" id="addColumnBtn" title="Create Column">
+                <i class="bi bi-layout-three-columns me-1"></i>Create Column
+            </button>
             <button class="btn fb-btn-secondary btn-sm" id="addMemberBtn" title="Add Member">
                 <i class="bi bi-person-plus me-1"></i>Add
             </button>
@@ -115,48 +121,10 @@
                     </div>
                 @endforeach
             </div>
-            {{-- Enhanced Add Task Form --}}
-            <div class="fb-add-task-form d-none">
-                <input type="text" class="form-control fb-input fb-new-task-input" placeholder="Task title..." style="padding-left:0.875rem!important; font-size:0.8125rem;">
-                <div class="row g-2 mt-1">
-                    <div class="col-6">
-                        <select class="form-select fb-input fb-new-task-priority" style="padding-left:0.75rem!important; font-size:0.75rem;">
-                            <option value="low">🟢 Low</option>
-                            <option value="medium" selected>🟡 Medium</option>
-                            <option value="high">🟠 High</option>
-                            <option value="urgent">🔴 Urgent</option>
-                        </select>
-                    </div>
-                    <div class="col-6">
-                        <input type="date" class="form-control fb-input fb-new-task-due" style="padding-left:0.75rem!important; font-size:0.75rem;" title="Due date">
-                    </div>
-                </div>
-                <div class="mt-1">
-                    <select class="form-select fb-input fb-new-task-assignees" multiple style="padding-left:0.75rem!important; font-size:0.75rem; min-height:auto; height:auto;" title="Assignees (Ctrl+click for multiple)">
-                        @foreach($boardMembers as $member)
-                            <option value="{{ $member->id }}">{{ $member->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="d-flex gap-2 mt-2">
-                    <button class="btn fb-btn-primary btn-sm fb-save-task"><i class="bi bi-plus-lg me-1"></i>Add</button>
-                    <button class="btn fb-btn-secondary btn-sm fb-cancel-task">Cancel</button>
-                </div>
-            </div>
-            <button class="fb-add-task-btn">
-                <i class="bi bi-plus me-1"></i> Add task
-            </button>
+
         </div>
     @endforeach
-
-    {{-- Add Column --}}
-    <div id="addColumnWrapper">
-        <button class="fb-add-column-btn" id="addColumnBtn">
-            <i class="bi bi-plus-lg"></i> Add Column
-        </button>
-    </div>
 </div>
-
 {{-- Task Detail Modal --}}
 <div class="modal fade" id="taskDetailModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
@@ -167,6 +135,63 @@
             </div>
             <div class="modal-body px-4 py-3">
                 {{-- Loaded dynamically --}}
+            </div>
+        </div>
+    </div>
+</div>
+
+{{-- Create Task Modal --}}
+<div class="modal fade" id="createTaskModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius: var(--fb-radius-xl); border: none; box-shadow: var(--fb-shadow-xl);">
+            <div class="modal-header border-0 px-4 pt-4 pb-0">
+                <h5 class="modal-title fw-bold"><i class="bi bi-plus-circle me-2 text-primary"></i>Create Task</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body px-4 py-3">
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Title <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control fb-input" id="createTaskTitle" placeholder="Enter task title" style="padding-left:0.875rem!important;">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Description (optional)</label>
+                    <textarea class="form-control fb-input" id="createTaskDesc" rows="3" placeholder="Add details..." style="padding-left:0.875rem!important;resize:none;"></textarea>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Target Column</label>
+                        <select class="form-select fb-input" id="createTaskColumn" style="padding-left:0.875rem!important;">
+                            <!-- Populated dynamically via JS -->
+                        </select>
+                    </div>
+                     <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Priority</label>
+                        <select class="form-select fb-input" id="createTaskPriority" style="padding-left:0.875rem!important;">
+                            <option value="low">Low</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="high">High</option>
+                            <option value="urgent">Urgent</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="row g-2 mb-3">
+                     <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Due Date (optional)</label>
+                        <input type="date" class="form-control fb-input" id="createTaskDueDate" style="padding-left:0.875rem!important;">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Assignees (optional)</label>
+                        <select class="form-select fb-input" id="createTaskAssignees" multiple style="padding-left:0.875rem!important; font-size:0.875rem; min-height:auto; height:38px;" title="Ctrl+click for multiple">
+                            @foreach($boardMembers as $member)
+                                <option value="{{ $member->id }}">{{ $member->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn fb-btn-primary w-100" id="submitCreateTaskModalBtn">Create Task</button>
+                    <button class="btn fb-btn-secondary w-100" data-bs-dismiss="modal">Cancel</button>
+                </div>
             </div>
         </div>
     </div>

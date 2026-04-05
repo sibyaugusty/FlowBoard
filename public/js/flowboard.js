@@ -293,7 +293,7 @@ $(document).ready(function () {
                 success: function (res) {
                     const col = res.column;
                     const html = buildColumnHtml(col.id, col.name, []);
-                    $(html).insertBefore('#addColumnWrapper');
+                    $(html).appendTo('#boardColumnsContainer');
                     initSortable();
                     fbToast('Column "' + col.name + '" added', 'success');
                 },
@@ -352,40 +352,60 @@ $(document).ready(function () {
         });
 
 
-        // ── Add Task ────────────────────────────────────────
-        $(document).on('click', '.fb-add-task-btn', function () {
-            const $col = $(this).closest('.fb-column');
-            const $form = $col.find('.fb-add-task-form');
-            // Reset form fields
-            $form.find('.fb-new-task-input').val('');
-            $form.find('.fb-new-task-priority').val('medium');
-            $form.find('.fb-new-task-due').val('');
-            $form.find('.fb-new-task-assignees').val([]);
-            $form.toggleClass('d-none');
-            $form.find('.fb-new-task-input').focus();
+        // ── Create Task (Modal) ─────────────────────────────
+        const $createTaskModal = $('#createTaskModal');
+        
+        $createTaskModal.on('show.bs.modal', function () {
+            // Reset form
+            $('#createTaskTitle').val('').removeClass('is-invalid');
+            $('#createTaskDesc').val('');
+            $('#createTaskPriority').val('medium');
+            $('#createTaskDueDate').val('');
+            $('#createTaskAssignees').val([]);
+            
+            // Populate Target Column dropdown
+            const $columnSelect = $('#createTaskColumn');
+            $columnSelect.empty();
+            
+            $('.fb-column').each(function () {
+                const colId = $(this).data('column-id');
+                const colName = $(this).find('.fb-column-title').text().trim();
+                $columnSelect.append(`<option value="${colId}">${escapeHtml(colName)}</option>`);
+            });
         });
 
-        $(document).on('click', '.fb-cancel-task', function () {
-            $(this).closest('.fb-add-task-form').addClass('d-none');
+        $('#createTaskTitle').on('input', function() {
+            $(this).removeClass('is-invalid');
         });
 
-        $(document).on('click', '.fb-save-task', function () {
-            const $form = $(this).closest('.fb-add-task-form');
-            const columnId = $form.closest('.fb-column').data('column-id');
-            const title = $form.find('.fb-new-task-input').val().trim();
-            const priority = $form.find('.fb-new-task-priority').val() || 'medium';
-            const dueDate = $form.find('.fb-new-task-due').val() || null;
-            const assignees = $form.find('.fb-new-task-assignees').val() || [];
+        $('#submitCreateTaskModalBtn').on('click', function () {
+            const title = $('#createTaskTitle').val().trim();
+            const description = $('#createTaskDesc').val().trim();
+            const columnId = $('#createTaskColumn').val();
+            const priority = $('#createTaskPriority').val() || 'medium';
+            const dueDate = $('#createTaskDueDate').val() || null;
+            const assignees = $('#createTaskAssignees').val() || [];
 
             if (!title) {
-                $form.find('.fb-new-task-input').addClass('is-invalid').focus();
+                $('#createTaskTitle').addClass('is-invalid').focus();
+                return;
+            }
+
+            if (!columnId) {
+                fbToast('Please create a column first', 'error');
                 return;
             }
 
             const btn = $(this);
-            btn.prop('disabled', true);
+            const originalText = btn.html();
+            btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Creating...');
 
-            const postData = { column_id: columnId, title: title, priority: priority };
+            const postData = { 
+                column_id: columnId, 
+                title: title, 
+                description: description,
+                priority: priority 
+            };
             if (dueDate) postData.due_date = dueDate;
             if (assignees.length) postData.assignees = assignees;
 
@@ -396,36 +416,21 @@ $(document).ready(function () {
                 success: function (res) {
                     const task = res.task;
                     const taskHtml = buildTaskCardHtml(task);
-                    $form.closest('.fb-column').find('.fb-task-list').append(taskHtml);
-                    $form.addClass('d-none');
-                    $form.find('.fb-new-task-input').val('');
+                    
+                    // Append task to the selected column
+                    $(`.fb-column[data-column-id="${columnId}"]`).find('.fb-task-list').append(taskHtml);
                     updateColumnCounts();
-                    fbToast('Task "' + escapeHtml(task.title) + '" added', 'success');
-                    btn.prop('disabled', false);
+                    
+                    fbToast('Task "' + escapeHtml(task.title) + '" created', 'success');
+                    btn.prop('disabled', false).html(originalText);
+                    $createTaskModal.modal('hide');
                 },
                 error: function () {
-                    fbToast('Failed to add task', 'error');
-                    btn.prop('disabled', false);
+                    fbToast('Failed to create task', 'error');
+                    btn.prop('disabled', false).html(originalText);
                 }
             });
         });
-
-        // Remove invalid state on input
-        $(document).on('input', '.fb-new-task-input', function () {
-            $(this).removeClass('is-invalid');
-        });
-
-        // Submit on Enter in add task input
-        $(document).on('keydown', '.fb-new-task-input', function (e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                $(this).closest('.fb-add-task-form').find('.fb-save-task').click();
-            }
-            if (e.key === 'Escape') {
-                $(this).closest('.fb-add-task-form').addClass('d-none');
-            }
-        });
-
 
         // ── Task Detail Modal ───────────────────────────────
         $(document).on('click', '.fb-task-card', function (e) {
