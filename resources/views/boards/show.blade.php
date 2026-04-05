@@ -115,8 +115,29 @@
                     </div>
                 @endforeach
             </div>
+            {{-- Enhanced Add Task Form --}}
             <div class="fb-add-task-form d-none">
                 <input type="text" class="form-control fb-input fb-new-task-input" placeholder="Task title..." style="padding-left:0.875rem!important; font-size:0.8125rem;">
+                <div class="row g-2 mt-1">
+                    <div class="col-6">
+                        <select class="form-select fb-input fb-new-task-priority" style="padding-left:0.75rem!important; font-size:0.75rem;">
+                            <option value="low">🟢 Low</option>
+                            <option value="medium" selected>🟡 Medium</option>
+                            <option value="high">🟠 High</option>
+                            <option value="urgent">🔴 Urgent</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <input type="date" class="form-control fb-input fb-new-task-due" style="padding-left:0.75rem!important; font-size:0.75rem;" title="Due date">
+                    </div>
+                </div>
+                <div class="mt-1">
+                    <select class="form-select fb-input fb-new-task-assignees" multiple style="padding-left:0.75rem!important; font-size:0.75rem; min-height:auto; height:auto;" title="Assignees (Ctrl+click for multiple)">
+                        @foreach($boardMembers as $member)
+                            <option value="{{ $member->id }}">{{ $member->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
                 <div class="d-flex gap-2 mt-2">
                     <button class="btn fb-btn-primary btn-sm fb-save-task"><i class="bi bi-plus-lg me-1"></i>Add</button>
                     <button class="btn fb-btn-secondary btn-sm fb-cancel-task">Cancel</button>
@@ -161,4 +182,11 @@
         <p class="text-muted small text-center py-3">Loading...</p>
     </div>
 </div>
+
+{{-- Pass board members data to JavaScript --}}
+@push('scripts')
+<script>
+    window._fbBoardMembers = @json($boardMembers->map(fn($m) => ['id' => $m->id, 'name' => $m->name])->values());
+</script>
+@endpush
 @endsection

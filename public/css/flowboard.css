@@ -1016,8 +1016,8 @@ body {
     border-radius: var(--fb-radius);
     border: 1px solid var(--fb-gray-200);
     margin-bottom: 0.5rem;
-    cursor: pointer;
-    transition: var(--fb-transition-fast);
+    cursor: grab;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
     position: relative;
     overflow: hidden;
 }
@@ -1025,6 +1025,10 @@ body {
 .fb-task-card:hover {
     border-color: rgba(var(--fb-primary-rgb), 0.3);
     box-shadow: var(--fb-shadow);
+}
+
+.fb-task-card:active {
+    cursor: grabbing;
 }
 
 .fb-task-card:hover .fb-task-delete {
@@ -1104,11 +1108,81 @@ body {
 
 /* Sortable Placeholder */
 .fb-sortable-placeholder {
-    border: 2px dashed var(--fb-gray-300);
+    border: 2px dashed rgba(var(--fb-primary-rgb), 0.35);
     border-radius: var(--fb-radius);
     margin-bottom: 0.5rem;
     min-height: 50px;
-    background: rgba(var(--fb-primary-rgb), 0.04);
+    background: rgba(var(--fb-primary-rgb), 0.05);
+    animation: fb-placeholder-pulse 2s ease-in-out infinite;
+    transition: height 0.15s ease;
+}
+
+@keyframes fb-placeholder-pulse {
+    0%, 100% { border-color: rgba(var(--fb-primary-rgb), 0.2); background: rgba(var(--fb-primary-rgb), 0.03); }
+    50% { border-color: rgba(var(--fb-primary-rgb), 0.45); background: rgba(var(--fb-primary-rgb), 0.07); }
+}
+
+/*
+ * CRITICAL: jQuery UI adds .ui-sortable-helper to the dragged element.
+ * We MUST kill ALL transitions here — otherwise CSS transition on
+ * top/left/transform causes the card to animate behind the cursor
+ * instead of following it instantly (the "position jump" bug).
+ */
+.ui-sortable-helper {
+    transition: none !important;
+    will-change: transform;
+    cursor: grabbing !important;
+    z-index: 9999 !important;
+}
+
+/* The original item's ghost left behind in the list during drag */
+.fb-task-card.fb-task-dragging {
+    opacity: 0;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    overflow: hidden;
+    transition: none !important;
+}
+
+/* Visual style applied to the helper clone via JS */
+.fb-drag-helper-lifted {
+    transform: rotate(1.5deg) scale(1.03);
+    box-shadow:
+        0 18px 40px -8px rgba(0, 0, 0, 0.2),
+        0 6px 16px -4px rgba(0, 0, 0, 0.12),
+        0 0 0 1.5px rgba(var(--fb-primary-rgb), 0.3);
+    border-color: rgba(var(--fb-primary-rgb), 0.4) !important;
+    background: var(--fb-white);
+    opacity: 1;
+}
+
+/* Settle animation: played once on the card after a successful drop */
+.fb-task-settling {
+    animation: fb-settle 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes fb-settle {
+    0% {
+        transform: rotate(1.5deg) scale(1.03);
+        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.15);
+    }
+    60% {
+        transform: rotate(-0.5deg) scale(1.005);
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+    }
+    100% {
+        transform: rotate(0deg) scale(1);
+        box-shadow: none;
+    }
+}
+
+/* Highlight the receiving column when dragging over it */
+.fb-task-list.ui-sortable-hover {
+    background: rgba(var(--fb-primary-rgb), 0.03);
+    border-radius: var(--fb-radius);
+    transition: background 0.2s ease;
 }
 
 /* Add Task Button / Form */
@@ -1133,6 +1207,21 @@ body {
 .fb-add-task-form {
     padding: 0.625rem;
     border-top: 1px solid var(--fb-gray-200);
+    background: rgba(var(--fb-primary-rgb), 0.02);
+}
+
+.fb-add-task-form .fb-input {
+    padding: 0.4rem 0.75rem 0.4rem 0.75rem !important;
+    font-size: 0.75rem !important;
+}
+
+.fb-add-task-form select[multiple] {
+    padding: 0.25rem 0.5rem !important;
+}
+
+.fb-add-task-form select[multiple] option {
+    padding: 0.2rem 0.25rem;
+    font-size: 0.75rem;
 }
 
 /* Add Column Wrapper */

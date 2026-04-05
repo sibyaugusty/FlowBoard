@@ -179,7 +179,11 @@ class TaskController extends Controller
             }
         }
 
-        return response()->json(['success' => true]);
+        return response()->json([
+            'success' => true,
+            'old_column' => $oldColumn->name,
+            'new_column' => $newColumn->name,
+        ]);
     }
 
     public function search(Request $request)

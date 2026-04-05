@@ -7,7 +7,8 @@
 
 $(document).ready(function () {
 
-    // ── CSRF Token Setup ────────────────────────────────────
+    // ── Base URL & CSRF Token Setup ─────────────────────────
+    const BASE_URL = ($('meta[name="app-url"]').attr('content') || '').replace(/\/+$/, '');
     const CSRF = $('meta[name="csrf-token"]').attr('content');
     $.ajaxSetup({
         headers: { 'X-CSRF-TOKEN': CSRF, 'Accept': 'application/json' }
@@ -64,14 +65,14 @@ $(document).ready(function () {
         btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Creating...');
 
         $.ajax({
-            url: '/api/boards',
+            url: BASE_URL + '/api/boards',
             method: 'POST',
             data: { name, description, color },
             success: function (res) {
                 fbToast('Board "' + res.board.name + '" created!', 'success');
                 $('#createBoardModal').modal('hide');
                 // Redirect to the new board
-                window.location.href = '/boards/' + res.board.id;
+                window.location.href = BASE_URL + '/boards/' + res.board.id;
             },
             error: function (xhr) {
                 const msg = xhr.responseJSON?.message || 'Failed to create board';
@@ -98,7 +99,7 @@ $(document).ready(function () {
     // NOTIFICATIONS
     // ============================================================
     function loadNotifications() {
-        $.get('/api/notifications', function (res) {
+        $.get(BASE_URL + '/api/notifications', function (res) {
             const badge = $('#notifBadge');
             if (res.unread_count > 0) {
                 badge.text(res.unread_count).removeClass('d-none');
@@ -144,7 +145,7 @@ $(document).ready(function () {
     $('#markAllRead').on('click', function (e) {
         e.preventDefault();
         e.stopPropagation();
-        $.post('/api/notifications/mark-read', function () {
+        $.post(BASE_URL + '/api/notifications/mark-read', function () {
             loadNotifications();
         });
     });
@@ -153,8 +154,8 @@ $(document).ready(function () {
     $(document).on('click', '[data-notif-id]', function () {
         const id = $(this).data('notif-id');
         const boardId = $(this).data('board-id');
-        $.post('/api/notifications/' + id + '/mark-read', function () {
-            if (boardId) window.location.href = '/boards/' + boardId;
+        $.post(BASE_URL + '/api/notifications/' + id + '/mark-read', function () {
+            if (boardId) window.location.href = BASE_URL + '/boards/' + boardId;
         });
     });
 
@@ -175,25 +176,89 @@ $(document).ready(function () {
         function initSortable() {
             $('.fb-task-list').sortable({
                 connectWith: '.fb-task-list',
-                handle: '.fb-task-card',
+                items: '.fb-task-card',
                 placeholder: 'fb-sortable-placeholder',
                 tolerance: 'pointer',
                 cursor: 'grabbing',
-                opacity: 0.8,
-                revert: 100,
+                distance: 3,
+                scrollSensitivity: 60,
+                scrollSpeed: 14,
+
+                // Clone-based helper: starts at the exact grab point,
+                // avoids position jump, and isn't clipped by column overflow.
+                helper: function (e, item) {
+                    const $clone = item.clone()
+                        .addClass('fb-drag-helper-lifted')
+                        .css({
+                            width: item.outerWidth(),
+                            height: item.outerHeight(),
+                            transition: 'none',
+                            'will-change': 'transform',
+                            'pointer-events': 'none'
+                        });
+                    return $clone;
+                },
+                appendTo: document.body,
+                forceHelperSize: true,
+                forcePlaceholderSize: true,
+
+                start: function (event, ui) {
+                    // Store the source column name for the toast
+                    ui.item.data('source-column-name',
+                        ui.item.closest('.fb-column').find('.fb-column-title').text().trim()
+                    );
+
+                    // Collapse the original item so only the placeholder remains
+                    ui.item.addClass('fb-task-dragging');
+
+                    // Size the placeholder to match the card
+                    ui.placeholder.css({
+                        height: ui.helper.outerHeight(),
+                        visibility: 'visible'
+                    });
+                },
+
+                stop: function (event, ui) {
+                    // Reveal the original item
+                    ui.item.removeClass('fb-task-dragging');
+
+                    // Inline styles jQuery UI leaves on the item
+                    ui.item.removeAttr('style');
+
+                    // Play the spring settle animation
+                    ui.item.addClass('fb-task-settling');
+                    setTimeout(function () {
+                        ui.item.removeClass('fb-task-settling');
+                    }, 320);
+                },
+
                 update: function (event, ui) {
                     // Only fire on the receiving list
                     if (this === ui.item.parent()[0]) {
                         const taskId = ui.item.data('task-id');
                         const newColumnId = ui.item.closest('.fb-column').data('column-id');
                         const newPosition = ui.item.index();
+                        const sourceColumnName = ui.item.data('source-column-name');
 
                         $.ajax({
-                            url: '/api/tasks/' + taskId + '/move',
+                            url: BASE_URL + '/api/tasks/' + taskId + '/move',
                             method: 'POST',
                             data: { column_id: newColumnId, position: newPosition },
-                            success: function () {
+                            success: function (res) {
                                 updateColumnCounts();
+
+                                // Show descriptive toast
+                                if (res.old_column && res.new_column && res.old_column !== res.new_column) {
+                                    fbToast(
+                                        `Task moved from <strong>${escapeHtml(res.old_column)}</strong> to <strong>${escapeHtml(res.new_column)}</strong>`,
+                                        'info'
+                                    );
+                                } else {
+                                    fbToast(
+                                        `Task reordered in <strong>${escapeHtml(res.new_column || sourceColumnName)}</strong>`,
+                                        'success'
+                                    );
+                                }
                             },
                             error: function () {
                                 fbToast('Failed to move task', 'error');
@@ -222,7 +287,7 @@ $(document).ready(function () {
             if (!name || !name.trim()) return;
 
             $.ajax({
-                url: '/api/boards/' + boardId + '/columns',
+                url: BASE_URL + '/api/boards/' + boardId + '/columns',
                 method: 'POST',
                 data: { name: name.trim() },
                 success: function (res) {
@@ -247,7 +312,7 @@ $(document).ready(function () {
             if (!newName || newName.trim() === currentName) return;
 
             $.ajax({
-                url: '/api/columns/' + columnId,
+                url: BASE_URL + '/api/columns/' + columnId,
                 method: 'PUT',
                 data: { name: newName.trim() },
                 success: function () {
@@ -274,7 +339,7 @@ $(document).ready(function () {
             if (!confirm(msg)) return;
 
             $.ajax({
-                url: '/api/columns/' + columnId,
+                url: BASE_URL + '/api/columns/' + columnId,
                 method: 'DELETE',
                 success: function () {
                     $col.fadeOut(300, function () { $(this).remove(); });
@@ -291,8 +356,13 @@ $(document).ready(function () {
         $(document).on('click', '.fb-add-task-btn', function () {
             const $col = $(this).closest('.fb-column');
             const $form = $col.find('.fb-add-task-form');
+            // Reset form fields
+            $form.find('.fb-new-task-input').val('');
+            $form.find('.fb-new-task-priority').val('medium');
+            $form.find('.fb-new-task-due').val('');
+            $form.find('.fb-new-task-assignees').val([]);
             $form.toggleClass('d-none');
-            $form.find('.fb-new-task-input').val('').focus();
+            $form.find('.fb-new-task-input').focus();
         });
 
         $(document).on('click', '.fb-cancel-task', function () {
@@ -303,16 +373,26 @@ $(document).ready(function () {
             const $form = $(this).closest('.fb-add-task-form');
             const columnId = $form.closest('.fb-column').data('column-id');
             const title = $form.find('.fb-new-task-input').val().trim();
+            const priority = $form.find('.fb-new-task-priority').val() || 'medium';
+            const dueDate = $form.find('.fb-new-task-due').val() || null;
+            const assignees = $form.find('.fb-new-task-assignees').val() || [];
 
-            if (!title) return;
+            if (!title) {
+                $form.find('.fb-new-task-input').addClass('is-invalid').focus();
+                return;
+            }
 
             const btn = $(this);
             btn.prop('disabled', true);
 
+            const postData = { column_id: columnId, title: title, priority: priority };
+            if (dueDate) postData.due_date = dueDate;
+            if (assignees.length) postData.assignees = assignees;
+
             $.ajax({
-                url: '/api/tasks',
+                url: BASE_URL + '/api/tasks',
                 method: 'POST',
-                data: { column_id: columnId, title: title },
+                data: postData,
                 success: function (res) {
                     const task = res.task;
                     const taskHtml = buildTaskCardHtml(task);
@@ -320,7 +400,7 @@ $(document).ready(function () {
                     $form.addClass('d-none');
                     $form.find('.fb-new-task-input').val('');
                     updateColumnCounts();
-                    fbToast('Task added', 'success');
+                    fbToast('Task "' + escapeHtml(task.title) + '" added', 'success');
                     btn.prop('disabled', false);
                 },
                 error: function () {
@@ -328,6 +408,11 @@ $(document).ready(function () {
                     btn.prop('disabled', false);
                 }
             });
+        });
+
+        // Remove invalid state on input
+        $(document).on('input', '.fb-new-task-input', function () {
+            $(this).removeClass('is-invalid');
         });
 
         // Submit on Enter in add task input
@@ -345,6 +430,8 @@ $(document).ready(function () {
         // ── Task Detail Modal ───────────────────────────────
         $(document).on('click', '.fb-task-card', function (e) {
             if ($(e.target).closest('.fb-task-delete').length) return;
+            // Don't open modal if we just finished dragging
+            if ($(this).hasClass('fb-task-dragging')) return;
             const taskId = $(this).data('task-id');
             openTaskDetail(taskId);
         });
@@ -358,7 +445,7 @@ $(document).ready(function () {
                 </div>`);
             $modal.modal('show');
 
-            $.get('/api/tasks/' + taskId, function (res) {
+            $.get(BASE_URL + '/api/tasks/' + taskId, function (res) {
                 const task = res.task;
                 renderTaskDetail(task);
             }).fail(function () {
@@ -387,7 +474,7 @@ $(document).ready(function () {
             const attachmentsHtml = (task.attachments || []).map(a => `
                 <div class="d-flex align-items-center gap-2 mb-2 small">
                     <i class="bi bi-paperclip"></i>
-                    <a href="/api/attachments/${a.id}/download" class="fb-link">${escapeHtml(a.filename)}</a>
+                    <a href="${BASE_URL}/api/attachments/${a.id}/download" class="fb-link">${escapeHtml(a.filename)}</a>
                     <span class="text-muted">(${formatFileSize(a.size)})</span>
                 </div>
             `).join('') || '<p class="text-muted small">No attachments</p>';
@@ -505,7 +592,7 @@ $(document).ready(function () {
                 const btn = $(this);
                 btn.prop('disabled', true);
                 $.ajax({
-                    url: '/api/tasks/' + task.id,
+                    url: BASE_URL + '/api/tasks/' + task.id,
                     method: 'PUT',
                     data: {
                         title: $('#editTaskTitle').val(),
@@ -532,7 +619,7 @@ $(document).ready(function () {
             $('#deleteTaskBtn').on('click', function () {
                 if (!confirm('Delete this task?')) return;
                 $.ajax({
-                    url: '/api/tasks/' + task.id,
+                    url: BASE_URL + '/api/tasks/' + task.id,
                     method: 'DELETE',
                     success: function () {
                         fbToast('Task deleted', 'success');
@@ -560,7 +647,7 @@ $(document).ready(function () {
                 $('#postCommentBtn').prop('disabled', true);
 
                 $.ajax({
-                    url: '/api/tasks/' + task.id + '/comments',
+                    url: BASE_URL + '/api/tasks/' + task.id + '/comments',
                     method: 'POST',
                     data: { body },
                     success: function (res) {
@@ -595,7 +682,7 @@ $(document).ready(function () {
                 formData.append('file', file);
 
                 $.ajax({
-                    url: '/api/tasks/' + task.id + '/attachments',
+                    url: BASE_URL + '/api/tasks/' + task.id + '/attachments',
                     method: 'POST',
                     data: formData,
                     processData: false,
@@ -605,7 +692,7 @@ $(document).ready(function () {
                         const html = `
                             <div class="d-flex align-items-center gap-2 mb-2 small">
                                 <i class="bi bi-paperclip"></i>
-                                <a href="/api/attachments/${a.id}/download" class="fb-link">${escapeHtml(a.filename)}</a>
+                                <a href="${BASE_URL}/api/attachments/${a.id}/download" class="fb-link">${escapeHtml(a.filename)}</a>
                                 <span class="text-muted">(${formatFileSize(a.size)})</span>
                             </div>`;
                         $('#attachmentsList').prepend(html);
@@ -627,7 +714,7 @@ $(document).ready(function () {
             if (!confirm('Delete this task?')) return;
 
             $.ajax({
-                url: '/api/tasks/' + taskId,
+                url: BASE_URL + '/api/tasks/' + taskId,
                 method: 'DELETE',
                 success: function () {
                     $card.fadeOut(200, function () {
@@ -645,7 +732,7 @@ $(document).ready(function () {
 
         // ── Activity Sidebar ────────────────────────────────
         function loadActivities() {
-            $.get('/api/boards/' + boardId + '/activities', function (res) {
+            $.get(BASE_URL + '/api/boards/' + boardId + '/activities', function (res) {
                 const $list = $('#activityList');
                 if (!res.activities.length) {
                     $list.html('<p class="text-muted small text-center py-3">No activity yet</p>');
@@ -683,11 +770,11 @@ $(document).ready(function () {
         $('#deleteBoardBtn').on('click', function () {
             if (!confirm('Are you sure you want to delete this board? This action cannot be undone.')) return;
             $.ajax({
-                url: '/api/boards/' + boardId,
+                url: BASE_URL + '/api/boards/' + boardId,
                 method: 'DELETE',
                 success: function () {
                     fbToast('Board deleted', 'success');
-                    window.location.href = '/dashboard';
+                    window.location.href = BASE_URL + '/dashboard';
                 },
                 error: function () {
                     fbToast('Failed to delete board', 'error');
@@ -701,7 +788,7 @@ $(document).ready(function () {
             if (!email || !email.trim()) return;
 
             $.ajax({
-                url: '/api/boards/' + boardId + '/members',
+                url: BASE_URL + '/api/boards/' + boardId + '/members',
                 method: 'POST',
                 data: { email: email.trim() },
                 success: function (res) {
@@ -727,6 +814,9 @@ $(document).ready(function () {
             tasksHtml += buildTaskCardHtml(task);
         });
 
+        // Build assignee options from the board members data
+        const assigneeOptions = buildAssigneeOptions();
+
         return `
             <div class="fb-column" data-column-id="${id}">
                 <div class="fb-column-header">
@@ -750,6 +840,24 @@ $(document).ready(function () {
                 </div>
                 <div class="fb-add-task-form d-none">
                     <input type="text" class="form-control fb-input fb-new-task-input" placeholder="Task title..." style="padding-left:0.875rem!important; font-size:0.8125rem;">
+                    <div class="row g-2 mt-1">
+                        <div class="col-6">
+                            <select class="form-select fb-input fb-new-task-priority" style="padding-left:0.75rem!important; font-size:0.75rem;">
+                                <option value="low">🟢 Low</option>
+                                <option value="medium" selected>🟡 Medium</option>
+                                <option value="high">🟠 High</option>
+                                <option value="urgent">🔴 Urgent</option>
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <input type="date" class="form-control fb-input fb-new-task-due" style="padding-left:0.75rem!important; font-size:0.75rem;" title="Due date">
+                        </div>
+                    </div>
+                    <div class="mt-1">
+                        <select class="form-select fb-input fb-new-task-assignees" multiple style="padding-left:0.75rem!important; font-size:0.75rem; min-height:auto; height:auto;" title="Assignees (Ctrl+click for multiple)">
+                            ${assigneeOptions}
+                        </select>
+                    </div>
                     <div class="d-flex gap-2 mt-2">
                         <button class="btn fb-btn-primary btn-sm fb-save-task"><i class="bi bi-plus-lg me-1"></i>Add</button>
                         <button class="btn fb-btn-secondary btn-sm fb-cancel-task">Cancel</button>
@@ -760,6 +868,16 @@ $(document).ready(function () {
                 </button>
             </div>`;
     };
+
+    // Helper to build assignee option tags from board member elements in the page
+    function buildAssigneeOptions() {
+        let options = '';
+        const memberData = window._fbBoardMembers || [];
+        memberData.forEach(m => {
+            options += `<option value="${m.id}">${escapeHtml(m.name)}</option>`;
+        });
+        return options;
+    }
 
     window.buildTaskCardHtml = function (task) {
         const priorityColors = { urgent: '#ef4444', high: '#f97316', medium: '#eab308', low: '#22c55e' };
@@ -852,7 +970,7 @@ $(document).ready(function () {
         searchTimeout = setTimeout(function () {
             // If on a board page, search within board
             if (boardId) {
-                $.get('/api/tasks/search', { q, board_id: boardId }, function (res) {
+                $.get(BASE_URL + '/api/tasks/search', { q, board_id: boardId }, function (res) {
                     showSearchResults(res.tasks);
                 });
             }
@@ -864,7 +982,7 @@ $(document).ready(function () {
         if (!tasks.length) return;
         let html = '<div id="globalSearchResults" class="fb-search-results">';
         tasks.forEach(t => {
-            html += `<a href="/boards/${t.column?.board_id || ''}" class="fb-search-result-item" data-task-id="${t.id}">
+            html += `<a href="${BASE_URL}/boards/${t.column?.board_id || ''}" class="fb-search-result-item" data-task-id="${t.id}">
                 <span class="fw-medium">${escapeHtml(t.title)}</span>
                 <small class="text-muted">${escapeHtml(t.column?.name || '')}</small>
             </a>`;

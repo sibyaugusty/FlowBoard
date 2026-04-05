@@ -32,7 +32,7 @@ class BoardController extends Controller
         $board = Board::create($validated);
 
         // Create default columns
-        $defaultColumns = ['To Do', 'In Progress', 'Review', 'Done'];
+        $defaultColumns = ['To Do', 'In Progress', 'On Hold', 'Review', 'Done'];
         foreach ($defaultColumns as $index => $name) {
             $board->columns()->create([
                 'name' => $name,
