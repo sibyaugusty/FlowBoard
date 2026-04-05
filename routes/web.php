@@ -9,6 +9,7 @@ use App\Http\Controllers\CommentController;
 use App\Http\Controllers\ActivityController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\FileAttachmentController;
+use App\Http\Controllers\AnalyticsController;
 
 /*
 |--------------------------------------------------------------------------
@@ -34,8 +35,10 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
 Route::middleware('auth')->group(function () {
 
-    // Dashboard
+    // Dashboard & Analytics
     Route::get('/dashboard', [BoardController::class, 'index'])->name('dashboard');
+    Route::get('/analytics', [AnalyticsController::class, 'index'])->name('analytics.index');
+    Route::get('/api/analytics/data', [AnalyticsController::class, 'data']);
 
     // Boards
     Route::post('/api/boards', [BoardController::class, 'store']);

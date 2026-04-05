@@ -35,6 +35,12 @@
 
             <div class="collapse navbar-collapse" id="navbarContent">
                 <ul class="navbar-nav ms-auto align-items-center">
+                    <!-- Analytics -->
+                    <li class="nav-item me-3">
+                        <a class="nav-link fw-semibold" href="{{ route('analytics.index') }}">
+                            <i class="bi bi-graph-up-arrow me-1"></i>Analytics
+                        </a>
+                    </li>
                     <!-- Search -->
                     <li class="nav-item me-3">
                         <div class="fb-nav-search">

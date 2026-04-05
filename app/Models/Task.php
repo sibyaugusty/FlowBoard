@@ -10,13 +10,15 @@ class Task extends Model
     use HasFactory;
 
     protected $fillable = [
-        'column_id', 'title', 'description', 'due_date', 'priority', 'position', 'created_by',
+        'column_id', 'title', 'description', 'due_date', 'priority', 'position', 'created_by', 'started_at', 'completed_at',
     ];
 
     protected function casts(): array
     {
         return [
             'due_date' => 'date',
+            'started_at' => 'datetime',
+            'completed_at' => 'datetime',
         ];
     }
 

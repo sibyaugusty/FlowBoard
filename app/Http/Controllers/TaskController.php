@@ -27,7 +27,7 @@ class TaskController extends Controller
         $column = Column::findOrFail($validated['column_id']);
         $maxPosition = $column->tasks()->max('position') ?? -1;
 
-        $task = Task::create([
+        $taskData = [
             'column_id' => $validated['column_id'],
             'title' => $validated['title'],
             'description' => $validated['description'] ?? null,
@@ -35,7 +35,16 @@ class TaskController extends Controller
             'priority' => $validated['priority'] ?? 'medium',
             'position' => $maxPosition + 1,
             'created_by' => Auth::id(),
-        ]);
+        ];
+
+        if (stripos($column->name, 'In Progress') !== false) {
+            $taskData['started_at'] = now();
+        }
+        if (stripos($column->name, 'Done') !== false || stripos($column->name, 'Completed') !== false) {
+            $taskData['completed_at'] = now();
+        }
+
+        $task = Task::create($taskData);
 
         // Assign users
         if (!empty($validated['assignees'])) {
@@ -150,10 +159,22 @@ class TaskController extends Controller
             ->where('position', '>=', $validated['position'])
             ->increment('position');
 
-        $task->update([
+        $updates = [
             'column_id' => $validated['column_id'],
             'position' => $validated['position'],
-        ]);
+        ];
+
+        if (stripos($newColumn->name, 'In Progress') !== false && is_null($task->started_at)) {
+            $updates['started_at'] = now();
+        }
+
+        if (stripos($newColumn->name, 'Done') !== false || stripos($newColumn->name, 'Completed') !== false) {
+            $updates['completed_at'] = now();
+        } else if (!is_null($task->completed_at)) {
+            $updates['completed_at'] = null; // Reset if moved out of done
+        }
+
+        $task->update($updates);
 
         $description = $oldColumn->id !== $newColumn->id
             ? "moved task \"{$task->title}\" from \"{$oldColumn->name}\" to \"{$newColumn->name}\""
